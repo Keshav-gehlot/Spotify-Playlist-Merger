@@ -191,15 +191,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       setMergeState({ status: MergeStatus.IDLE, progress: 0, message: '' });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-base mb-4"></div>
-        <p className="text-gray-400 animate-pulse">Loading your library...</p>
-      </div>
-    );
-  }
-
   // Render Success Screen if successful
   if (mergeState.status === MergeStatus.SUCCESS && mergeState.resultPlaylist) {
       return (
@@ -222,15 +213,22 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
              <h1 className="text-xl font-bold">Playlist Merger</h1>
          </div>
          <div className="flex items-center space-x-4">
-             {user && (
-                 <div className="flex items-center space-x-2 text-sm">
-                     {user.images?.[0] ? (
-                         <img src={user.images[0].url} alt={user.display_name} className="w-8 h-8 rounded-full border border-[#282828]" />
-                     ) : (
-                         <div className="w-8 h-8 rounded-full bg-[#535353] flex items-center justify-center text-xs font-bold">{user.display_name.charAt(0)}</div>
-                     )}
-                     <span className="hidden md:inline font-medium">{user.display_name}</span>
-                 </div>
+             {loading ? (
+                <div className="flex items-center space-x-2 animate-pulse">
+                    <div className="w-8 h-8 rounded-full bg-[#282828]"></div>
+                    <div className="h-4 w-24 bg-[#282828] rounded hidden md:block"></div>
+                </div>
+             ) : (
+                user && (
+                    <div className="flex items-center space-x-2 text-sm">
+                        {user.images?.[0] ? (
+                            <img src={user.images[0].url} alt={user.display_name} className="w-8 h-8 rounded-full border border-[#282828]" />
+                        ) : (
+                            <div className="w-8 h-8 rounded-full bg-[#535353] flex items-center justify-center text-xs font-bold">{user.display_name.charAt(0)}</div>
+                        )}
+                        <span className="hidden md:inline font-medium">{user.display_name}</span>
+                    </div>
+                )
              )}
              <button onClick={onLogout} className="text-sm font-semibold text-gray-400 hover:text-white transition-colors">
                  Logout
@@ -240,57 +238,71 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
       {/* Main Content */}
       <main className="p-6 max-w-7xl mx-auto">
-         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
-             <div>
-                <h2 className="text-2xl font-bold mb-1">Select Playlists</h2>
-                <p className="text-gray-400 text-sm">Choose the playlists you want to combine. Duplicates are removed automatically.</p>
-             </div>
-             
-             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                 <div className="relative">
-                    <select
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value as SortOption)}
-                        className="appearance-none bg-[#282828] text-white text-sm font-bold rounded-full pl-4 pr-10 py-2 border border-[#535353] hover:border-white focus:outline-none focus:border-spotify-base transition-colors cursor-pointer w-full sm:w-auto"
-                    >
-                        <option value="NAME_ASC">Name (A-Z)</option>
-                        <option value="NAME_DESC">Name (Z-A)</option>
-                        <option value="TRACKS_DESC">Tracks (Most)</option>
-                        <option value="TRACKS_ASC">Tracks (Least)</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-white">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                    </div>
+        {loading ? (
+           <div className="flex flex-col items-center justify-center py-24 space-y-4">
+             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-base"></div>
+             <p className="text-gray-400 animate-pulse font-medium">Loading your library...</p>
+           </div>
+        ) : (
+         <>
+             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
+                 <div>
+                    <h2 className="text-2xl font-bold mb-1">Select Playlists</h2>
+                    <p className="text-gray-400 text-sm">Choose the playlists you want to combine. Duplicates are removed automatically.</p>
                  </div>
+                 
+                 <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                     <div className="relative">
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value as SortOption)}
+                            className="appearance-none bg-[#282828] text-white text-sm font-bold rounded-full pl-4 pr-10 py-2 border border-[#535353] hover:border-white focus:outline-none focus:border-spotify-base transition-colors cursor-pointer w-full sm:w-auto"
+                        >
+                            <option value="NAME_ASC">Name (A-Z)</option>
+                            <option value="NAME_DESC">Name (Z-A)</option>
+                            <option value="TRACKS_DESC">Tracks (Most)</option>
+                            <option value="TRACKS_ASC">Tracks (Least)</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-white">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        </div>
+                     </div>
 
-                 <div className="flex space-x-3">
-                     <button 
-                        onClick={handleSelectAll}
-                        className="flex-1 sm:flex-none px-4 py-2 rounded-full border border-[#535353] text-sm font-bold hover:border-white transition-colors"
-                     >
-                        {selectedIds.size === playlists.length && playlists.length > 0 ? 'Deselect All' : 'Select All'}
-                     </button>
-                     <div className="bg-[#282828] px-4 py-2 rounded-full text-sm font-bold text-gray-300 border border-transparent whitespace-nowrap">
-                         {selectedIds.size} selected
+                     <div className="flex space-x-3">
+                         <button 
+                            onClick={handleSelectAll}
+                            className="flex-1 sm:flex-none px-4 py-2 rounded-full border border-[#535353] text-sm font-bold hover:border-white transition-colors"
+                         >
+                            {selectedIds.size === playlists.length && playlists.length > 0 ? 'Deselect All' : 'Select All'}
+                         </button>
+                         <div className="bg-[#282828] px-4 py-2 rounded-full text-sm font-bold text-gray-300 border border-transparent whitespace-nowrap">
+                             {selectedIds.size} selected
+                         </div>
                      </div>
                  </div>
              </div>
-         </div>
 
-         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-             {sortedPlaylists.map(playlist => (
-                 <PlaylistCard 
-                    key={playlist.id} 
-                    playlist={playlist} 
-                    isSelected={selectedIds.has(playlist.id)} 
-                    onToggle={toggleSelection} 
-                 />
-             ))}
-         </div>
+             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                 {sortedPlaylists.map(playlist => (
+                     <PlaylistCard 
+                        key={playlist.id} 
+                        playlist={playlist} 
+                        isSelected={selectedIds.has(playlist.id)} 
+                        onToggle={toggleSelection} 
+                     />
+                 ))}
+                 {playlists.length === 0 && (
+                    <div className="col-span-full text-center py-10 text-gray-500">
+                        No playlists found.
+                    </div>
+                 )}
+             </div>
+         </>
+        )}
       </main>
 
       {/* Floating Action Button */}
-      <div className={`fixed bottom-0 left-0 right-0 bg-[#181818] border-t border-[#282828] p-4 transition-transform duration-300 transform ${selectedIds.size > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 bg-[#181818] border-t border-[#282828] p-4 transition-transform duration-300 transform ${selectedIds.size > 0 && !loading ? 'translate-y-0' : 'translate-y-full'}`}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="text-sm">
                   <span className="text-spotify-base font-bold">{selectedIds.size} playlists</span> ready to merge
