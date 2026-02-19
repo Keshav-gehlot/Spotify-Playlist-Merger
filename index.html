@@ -25,6 +25,17 @@
         }
       }
     </script>
+    <script>
+      // Global error handler to catch initialization errors and display them on screen
+      window.addEventListener('error', function(event) {
+        const errorMsg = event.message || "Unknown Error";
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; background: #990000; color: white; padding: 20px; z-index: 10000; font-family: monospace; white-space: pre-wrap;';
+        errorDiv.textContent = 'Application Error:\n' + errorMsg + '\n\nOpen console for more details.';
+        document.body.appendChild(errorDiv);
+        console.error("Caught global error:", event.error);
+      });
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
