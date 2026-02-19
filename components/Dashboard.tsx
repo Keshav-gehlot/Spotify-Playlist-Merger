@@ -134,7 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       }
 
       if (urisToAdd.length === 0) {
-          throw new Error("No valid tracks found in selected playlists.");
+          throw new Error("NO_VALID_TRACKS");
       }
 
       // 2. Create Playlist
@@ -170,15 +170,38 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       setSelectedIds(new Set());
 
     } catch (error: any) {
-        console.error(error);
+        console.error("Merge error:", error);
+        
         if (error.message === 'UNAUTHORIZED') {
             onLogout();
             return;
         }
+
+        let friendlyMessage = "Something went wrong. Please try again.";
+        const errorMessage = error?.message || '';
+        
+        if (errorMessage === "NO_VALID_TRACKS" || errorMessage.includes("No valid tracks")) {
+             friendlyMessage = "The selected playlists don't contain any valid tracks to merge.";
+        } else if (errorMessage.includes("Spotify API Error")) {
+             if (errorMessage.includes("429")) {
+                 friendlyMessage = "You're merging too fast! Spotify has temporarily limited requests. Please wait a minute and try again.";
+             } else if (errorMessage.includes("500") || errorMessage.includes("502") || errorMessage.includes("503") || errorMessage.includes("504")) {
+                 friendlyMessage = "Spotify's servers are experiencing issues. Please try again later.";
+             } else if (errorMessage.includes("403")) {
+                 friendlyMessage = "You don't have permission to perform this action. Ensure you are logged in correctly.";
+             } else {
+                 friendlyMessage = "Unable to communicate with Spotify. Please check your internet connection.";
+             }
+        } else if (errorMessage.includes("Failed to fetch") || error.name === 'TypeError') {
+             friendlyMessage = "Network error. Please check your internet connection and try again.";
+        } else if (errorMessage) {
+             friendlyMessage = errorMessage;
+        }
+
         setMergeState({
             status: MergeStatus.ERROR,
             progress: 0,
-            message: error.message || "An unexpected error occurred."
+            message: friendlyMessage
         });
     }
   };
@@ -297,7 +320,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
           </div>
       </div>
 
-      <MergeStatusModal state={mergeState} onClose={() => setMergeState(s => ({...s, status: MergeStatus.IDLE}))} />
+      <MergeStatusModal 
+        state={mergeState} 
+        onClose={() => setMergeState(s => ({...s, status: MergeStatus.IDLE}))} 
+        onRetry={handleMerge}
+      />
     </div>
   );
 };

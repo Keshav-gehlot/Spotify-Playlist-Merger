@@ -4,9 +4,10 @@ import { MergeState, MergeStatus } from '../types';
 interface MergeStatusModalProps {
   state: MergeState;
   onClose: () => void;
+  onRetry?: () => void;
 }
 
-const MergeStatusModal: React.FC<MergeStatusModalProps> = ({ state, onClose }) => {
+const MergeStatusModal: React.FC<MergeStatusModalProps> = ({ state, onClose, onRetry }) => {
   if (state.status === MergeStatus.IDLE) return null;
 
   const isSuccess = state.status === MergeStatus.SUCCESS;
@@ -67,6 +68,15 @@ const MergeStatusModal: React.FC<MergeStatusModalProps> = ({ state, onClose }) =
                 </a>
             )}
             
+            {isError && onRetry && (
+                 <button 
+                    onClick={onRetry}
+                    className="block w-full bg-spotify-base text-black font-bold py-3 px-6 rounded-full hover:bg-spotify-dark transition-colors"
+                >
+                    Retry
+                </button>
+            )}
+
             {(isSuccess || isError) && (
                  <button 
                     onClick={onClose}
