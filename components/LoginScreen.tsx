@@ -1,53 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { CLIENT_ID_STORAGE_KEY, getRedirectUri, SCOPES, SPOTIFY_AUTH_ENDPOINT } from '../constants';
 
 const LoginScreen: React.FC = () => {
-  const [clientId, setClientId] = useState('237c702e5d5d49c5a6529b5e51e8f835');
-  const [redirectUri, setRedirectUri] = useState('');
   const [inIframe, setInIframe] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
-    if (stored) setClientId(stored);
-    
-    // Default to calculated URI, but allow user to edit
-    setRedirectUri(getRedirectUri());
-    
     // Check if running in an iframe
     setInIframe(window.self !== window.top);
   }, []);
 
   const handleLogin = () => {
-    if (!clientId) {
-      alert('Please enter a Client ID');
-      return;
-    }
-    localStorage.setItem(CLIENT_ID_STORAGE_KEY, clientId);
-    
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      scope: SCOPES.join(' '),
-      response_type: 'token',
-      show_dialog: 'true',
-    });
-
-    const authUrl = `${SPOTIFY_AUTH_ENDPOINT}?${params.toString()}`;
-
-    // Spotify's auth page sends "X-Frame-Options: DENY", so it cannot be loaded in an iframe.
-    // We must try to navigate the top-level window to break out of the iframe.
-    if (window.top && window.self !== window.top) {
-        try {
-            window.top.location.href = authUrl;
-        } catch (e) {
-            console.warn("Could not redirect top window:", e);
-            // Fallback: try standard navigation. If strict sandbox, this might still fail 
-            // with 'refused to connect', hence the UI warning.
-            window.location.href = authUrl;
-        }
-    } else {
-        window.location.href = authUrl;
-    }
+    // Redirect to the Python Backend Login Endpoint
+    // Assuming backend is running on port 8000
+    window.location.href = 'http://localhost:8000/login';
   };
 
   return (
@@ -65,61 +29,35 @@ const LoginScreen: React.FC = () => {
           Merge your favorite playlists, remove duplicates, and organize your library.
         </p>
 
-        <div className="bg-[#181818] p-6 rounded-lg shadow-xl border border-[#282828] text-left space-y-4">
-          <h2 className="text-xl font-semibold mb-2">Configuration</h2>
+        <div className="bg-[#181818] p-8 rounded-xl shadow-xl border border-[#282828] text-center space-y-6">
           
           {inIframe && (
-              <div className="bg-yellow-900/30 text-yellow-200 p-3 rounded text-sm border border-yellow-700/50 mb-4 flex items-start space-x-2">
+              <div className="bg-yellow-900/30 text-yellow-200 p-3 rounded text-sm border border-yellow-700/50 mb-4 flex items-start space-x-2 text-left">
                   <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <div>
-                    <strong>Running in a preview mode?</strong> <br/>
-                    Spotify authentication will be blocked in this window. <br/>
-                    Please open this app in a new tab/window to log in.
+                    <strong>Preview Mode Detected</strong> <br/>
+                    Please open this app in a new window to authenticate securely.
                   </div>
               </div>
           )}
 
-          <p className="text-sm text-gray-400 mb-4">
-            To use this app, you need a Spotify Client ID. <a href="https://developer.spotify.com/dashboard/applications" target="_blank" rel="noreferrer" className="text-spotify-base underline hover:text-green-400">Create one here</a>.
+          <p className="text-gray-300">
+            Click below to authenticate securely via Spotify.
           </p>
           
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Client ID
-            </label>
-            <input 
-              type="text" 
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="e.g., 3489...239"
-              className="w-full bg-[#121212] border border-[#333] text-white rounded p-3 focus:outline-none focus:border-spotify-base transition-colors"
-            />
-          </div>
-          
-          <div>
-             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Redirect URI (Must match exactly in Spotify Dashboard)
-            </label>
-             <input 
-              type="text"
-              value={redirectUri}
-              onChange={(e) => setRedirectUri(e.target.value)}
-              className="w-full bg-[#121212] border border-[#333] text-gray-300 rounded p-3 text-sm font-mono focus:outline-none focus:border-spotify-base transition-colors"
-             />
-             <p className="text-xs text-gray-500 mt-1">
-               <strong>Important:</strong> Ensure this URL is added to your Spotify App's Redirect URIs setting. It must match character-for-character (including http/https and trailing slashes).
-             </p>
-          </div>
-
           <button 
             onClick={handleLogin}
-            className="w-full bg-spotify-base hover:bg-spotify-dark text-white font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center space-x-2 mt-4"
+            className="w-full bg-spotify-base hover:bg-spotify-dark text-black font-bold py-4 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(29,185,84,0.3)] flex items-center justify-center space-x-2"
           >
-            <span>Log in with Spotify</span>
+            <span>Login with Spotify</span>
           </button>
         </div>
+        
+        <p className="text-xs text-gray-600">
+            Powered by FastAPI & React
+        </p>
       </div>
     </div>
   );
