@@ -9,9 +9,10 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    // Redirect to the Python Backend Login Endpoint
-    // Assuming backend is running on port 8000
-    window.location.href = 'http://localhost:8000/login';
+    // Redirect to the Login Endpoint.
+    // Local: Handled by Vite Proxy -> localhost:8000
+    // Prod: Handled by Vercel Rewrites -> Python Function
+    window.location.href = '/login';
   };
 
   return (
