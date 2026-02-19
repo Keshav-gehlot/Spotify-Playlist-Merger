@@ -1,6 +1,10 @@
 import os
 import urllib.parse
 from typing import Optional, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -26,7 +30,11 @@ app.add_middleware(
 
 def get_spotify_oauth():
     if not CLIENT_ID or not CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="Server misconfiguration: Missing Spotify Credentials")
+        print("CRITICAL ERROR: SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not found.")
+        raise HTTPException(
+            status_code=500, 
+            detail="Server misconfiguration: Missing Spotify Credentials. Please ensure a .env file exists in the root directory with SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET defined."
+        )
         
     return SpotifyOAuth(
         client_id=CLIENT_ID,
