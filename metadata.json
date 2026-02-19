@@ -1,0 +1,5 @@
+{
+  "name": "Spotify Playlist Merger",
+  "description": "A modern, dark-themed React application to merge multiple Spotify playlists into one, automatically removing duplicates. Built with a serverless architecture using Spotify's Implicit Grant Flow.",
+  "requestFramePermissions": []
+}
