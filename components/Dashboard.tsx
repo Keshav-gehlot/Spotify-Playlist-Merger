@@ -29,15 +29,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
         setUser(userData);
         const userPlaylists = await spotifyService.getUserPlaylists(userData.id);
         setPlaylists(userPlaylists);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to load data", err);
-        // If 401, service usually reloads page, but we can handle UI error here if needed
+        if (err.message === 'UNAUTHORIZED') {
+            onLogout();
+        }
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, [spotifyService]);
+  }, [spotifyService, onLogout]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
@@ -62,26 +64,43 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
     try {
       // 1. Fetch tracks
+      // Using concurrency to fetch multiple playlists at once to speed up the process
       const selectedPlaylists = playlists.filter(p => selectedIds.has(p.id));
       const allUris = new Set<string>();
-      let processedPlaylists = 0;
-
-      for (const playlist of selectedPlaylists) {
-        setMergeState({
+      let processedCount = 0;
+      
+      const CONCURRENCY_LIMIT = 3;
+      
+      // Process playlists in chunks
+      for (let i = 0; i < selectedPlaylists.length; i += CONCURRENCY_LIMIT) {
+          const chunk = selectedPlaylists.slice(i, i + CONCURRENCY_LIMIT);
+          
+          setMergeState({
             status: MergeStatus.FETCHING_TRACKS,
-            progress: 10 + Math.floor((processedPlaylists / selectedPlaylists.length) * 40),
-            message: `Fetching tracks from "${playlist.name}"...`
-        });
+            progress: 10 + Math.floor((processedCount / selectedPlaylists.length) * 50),
+            message: `Fetching tracks from ${chunk.map(p => `"${p.name}"`).join(', ')}...`
+          });
 
-        const tracks = await spotifyService.getPlaylistTracks(playlist.id);
-        tracks.forEach(t => allUris.add(t.track.uri));
-        processedPlaylists++;
+          await Promise.all(chunk.map(async (playlist) => {
+              const tracks = await spotifyService.getPlaylistTracks(playlist.id);
+              tracks.forEach(t => {
+                  if (t.track && t.track.uri) {
+                      allUris.add(t.track.uri);
+                  }
+              });
+          }));
+          
+          processedCount += chunk.length;
+      }
+
+      if (allUris.size === 0) {
+          throw new Error("No valid tracks found in selected playlists.");
       }
 
       // 2. Create Playlist
       setMergeState({
         status: MergeStatus.CREATING_PLAYLIST,
-        progress: 60,
+        progress: 70,
         message: 'Creating new playlist "Merged Playlist"...',
       });
       
@@ -94,7 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       // 3. Add Tracks
       setMergeState({
         status: MergeStatus.ADDING_TRACKS,
-        progress: 80,
+        progress: 85,
         message: `Adding ${allUris.size} unique tracks...`,
       });
 
@@ -104,15 +123,18 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
         status: MergeStatus.SUCCESS,
         progress: 100,
         message: `Successfully merged ${allUris.size} tracks into "${newPlaylist.name}"`,
-        resultUrl: newPlaylist.uri // Use URI for deep link or external_urls.spotify for web
-            .replace('spotify:playlist:', 'https://open.spotify.com/playlist/')
+        resultUrl: newPlaylist.uri.replace('spotify:playlist:', 'https://open.spotify.com/playlist/')
       });
 
-      // Clear selection after success? 
+      // Optional: Deselect all after success
       setSelectedIds(new Set());
 
     } catch (error: any) {
         console.error(error);
+        if (error.message === 'UNAUTHORIZED') {
+            onLogout();
+            return;
+        }
         setMergeState({
             status: MergeStatus.ERROR,
             progress: 0,

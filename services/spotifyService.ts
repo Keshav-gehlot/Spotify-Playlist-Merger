@@ -7,7 +7,11 @@ export class SpotifyService {
     this.accessToken = accessToken;
   }
 
-  private async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  private async wait(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async fetchWithAuth(url: string, options: RequestInit = {}, retries = 3): Promise<Response> {
     const headers = {
       'Authorization': `Bearer ${this.accessToken}`,
       'Content-Type': 'application/json',
@@ -16,11 +20,16 @@ export class SpotifyService {
 
     const response = await fetch(url, { ...options, headers });
 
+    // Handle Rate Limiting (429)
+    if (response.status === 429 && retries > 0) {
+        const retryAfterSecs = parseInt(response.headers.get('Retry-After') || '1', 10);
+        // Wait retryAfter + 1 second buffer
+        await this.wait((retryAfterSecs + 1) * 1000);
+        return this.fetchWithAuth(url, options, retries - 1);
+    }
+
     if (response.status === 401) {
-      // Token expired
-      window.location.hash = '';
-      window.location.reload();
-      throw new Error('Token expired');
+      throw new Error('UNAUTHORIZED');
     }
 
     if (!response.ok) {
@@ -52,14 +61,16 @@ export class SpotifyService {
 
   async getPlaylistTracks(playlistId: string, onProgress?: (count: number) => void): Promise<SpotifyTrack[]> {
     let tracks: SpotifyTrack[] = [];
-    let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,name,uri,artists,album,duration_ms),is_local),next,total`;
+    // Removed specific 'fields' filter to ensure we get full objects and avoid missing nested data like images
+    let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
 
     while (nextUrl) {
       const response = await this.fetchWithAuth(nextUrl);
       const data: SpotifyPaginatedResponse<SpotifyTrack> = await response.json();
       
       // Filter out null tracks or local files which might not have URIs accessible globally
-      const validTracks = data.items.filter(item => item.track && item.track.uri && !item.is_local);
+      // Note: check for item.track because sometimes the track object itself is null (e.g. episodes/removed content)
+      const validTracks = data.items.filter(item => item && item.track && item.track.uri && !item.is_local);
       tracks = [...tracks, ...validTracks];
       
       if (onProgress) {
@@ -78,7 +89,7 @@ export class SpotifyService {
       body: JSON.stringify({
         name,
         description,
-        public: false
+        public: false // Creating private playlist by default
       })
     });
     return response.json();

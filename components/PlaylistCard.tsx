@@ -8,7 +8,8 @@ interface PlaylistCardProps {
 }
 
 const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, isSelected, onToggle }) => {
-  const imageUrl = playlist.images && playlist.images.length > 0 ? playlist.images[0].url : 'https://picsum.photos/300/300';
+  const hasImage = playlist.images && playlist.images.length > 0;
+  const imageUrl = hasImage ? playlist.images[0].url : '';
 
   return (
     <div 
@@ -19,13 +20,22 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({ playlist, isSelected, onTog
         ${isSelected ? 'bg-spotify-card ring-2 ring-spotify-base ring-offset-2 ring-offset-[#121212]' : 'bg-spotify-card'}
       `}
     >
-      <div className="relative aspect-square mb-4 shadow-lg rounded-md overflow-hidden bg-[#282828]">
-         <img 
-            src={imageUrl} 
-            alt={playlist.name} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
+      <div className="relative aspect-square mb-4 shadow-lg rounded-md overflow-hidden bg-[#282828] flex items-center justify-center">
+         {hasImage ? (
+             <img 
+                src={imageUrl} 
+                alt={playlist.name} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
+         ) : (
+             <div className="w-full h-full flex items-center justify-center bg-[#282828] group-hover:bg-[#333] transition-colors">
+                <svg className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+             </div>
+         )}
+          
           {isSelected && (
             <div className="absolute top-2 right-2 bg-spotify-base rounded-full p-1 shadow-md">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">

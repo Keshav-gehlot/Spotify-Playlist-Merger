@@ -9,10 +9,17 @@ export const SCOPES = [
 ];
 
 export const CLIENT_ID_STORAGE_KEY = "spotify_merger_client_id";
-export const REDIRECT_URI = window.location.origin + window.location.pathname;
 
 // Helper to determine if we are in a hash route or not for redirect
 export const getRedirectUri = () => {
-    // Remove any hash from the current window location to get clean base
-    return window.location.href.split('#')[0];
+    // 1. Get base URL without hash
+    let url = window.location.href.split('#')[0].split('?')[0];
+    
+    // 2. Remove trailing slash if it exists (unless it's just the protocol)
+    if (url.endsWith('/') && url.length > 8) {
+        url = url.slice(0, -1);
+    }
+    
+    return url;
 };
+export const REDIRECT_URI = getRedirectUri();
