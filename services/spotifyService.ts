@@ -47,13 +47,26 @@ export class SpotifyService {
 
   async getUserPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
     let playlists: SpotifyPlaylist[] = [];
-    let nextUrl: string | null = `https://api.spotify.com/v1/users/${userId}/playlists?limit=50`;
+    // Use 'me/playlists' to ensure we get all playlists (owned + followed)
+    // We start with the max limit of 50 per page
+    let nextUrl: string | null = 'https://api.spotify.com/v1/me/playlists?limit=50';
 
     while (nextUrl) {
-      const response = await this.fetchWithAuth(nextUrl);
-      const data: SpotifyPaginatedResponse<SpotifyPlaylist> = await response.json();
-      playlists = [...playlists, ...data.items];
-      nextUrl = data.next;
+      try {
+        const response = await this.fetchWithAuth(nextUrl);
+        const data: SpotifyPaginatedResponse<SpotifyPlaylist> = await response.json();
+        
+        // Filter out null items which can occasionally appear in the API response
+        if (data.items) {
+          playlists = [...playlists, ...data.items.filter(p => p !== null)];
+        }
+        
+        nextUrl = data.next;
+      } catch (error) {
+        console.error("Error fetching playlists page:", error);
+        // If one page fails, we stop but return what we have so far
+        break;
+      }
     }
 
     return playlists;

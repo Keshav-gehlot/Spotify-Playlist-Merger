@@ -9,11 +9,14 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
+type SortOption = 'NAME_ASC' | 'NAME_DESC' | 'TRACKS_ASC' | 'TRACKS_DESC';
+
 const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
   const [user, setUser] = useState<SpotifyUser | null>(null);
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [sortOption, setSortOption] = useState<SortOption>('NAME_ASC');
   const [mergeState, setMergeState] = useState<MergeState>({
     status: MergeStatus.IDLE,
     progress: 0,
@@ -41,6 +44,23 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
     init();
   }, [spotifyService, onLogout]);
 
+  const sortedPlaylists = useMemo(() => {
+    return [...playlists].sort((a, b) => {
+      switch (sortOption) {
+        case 'NAME_ASC':
+          return a.name.localeCompare(b.name);
+        case 'NAME_DESC':
+          return b.name.localeCompare(a.name);
+        case 'TRACKS_DESC':
+          return b.tracks.total - a.tracks.total;
+        case 'TRACKS_ASC':
+          return a.tracks.total - b.tracks.total;
+        default:
+          return 0;
+      }
+    });
+  }, [playlists, sortOption]);
+
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -66,7 +86,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       // 1. Fetch tracks
       // Using concurrency to fetch multiple playlists at once to speed up the process
       const selectedPlaylists = playlists.filter(p => selectedIds.has(p.id));
-      const allUris = new Set<string>();
+      
+      // We use a set to track composite keys (Name + Artist + Album) to avoid duplicates
+      const seenTracks = new Set<string>();
+      const urisToAdd: string[] = [];
+      
       let processedCount = 0;
       
       const CONCURRENCY_LIMIT = 3;
@@ -85,7 +109,22 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
               const tracks = await spotifyService.getPlaylistTracks(playlist.id);
               tracks.forEach(t => {
                   if (t.track && t.track.uri) {
-                      allUris.add(t.track.uri);
+                      const trackName = t.track.name.trim().toLowerCase();
+                      const artistName = t.track.artists.length > 0 
+                          ? t.track.artists[0].name.trim().toLowerCase() 
+                          : 'unknown';
+                      // Consider album name to differentiate versions (e.g. Live vs Studio, or different compilations)
+                      const albumName = t.track.album && t.track.album.name 
+                          ? t.track.album.name.trim().toLowerCase() 
+                          : 'unknown';
+                      
+                      // Composite key: name|artist|album
+                      const compositeKey = `${trackName}|${artistName}|${albumName}`;
+                      
+                      if (!seenTracks.has(compositeKey)) {
+                          seenTracks.add(compositeKey);
+                          urisToAdd.push(t.track.uri);
+                      }
                   }
               });
           }));
@@ -93,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
           processedCount += chunk.length;
       }
 
-      if (allUris.size === 0) {
+      if (urisToAdd.length === 0) {
           throw new Error("No valid tracks found in selected playlists.");
       }
 
@@ -114,15 +153,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       setMergeState({
         status: MergeStatus.ADDING_TRACKS,
         progress: 85,
-        message: `Adding ${allUris.size} unique tracks...`,
+        message: `Adding ${urisToAdd.length} unique tracks...`,
       });
 
-      await spotifyService.addTracksToPlaylist(newPlaylist.id, Array.from(allUris));
+      await spotifyService.addTracksToPlaylist(newPlaylist.id, urisToAdd);
 
       setMergeState({
         status: MergeStatus.SUCCESS,
         progress: 100,
-        message: `Successfully merged ${allUris.size} tracks into "${newPlaylist.name}"`,
+        message: `Successfully merged ${urisToAdd.length} tracks into "${newPlaylist.name}"`,
         resultUrl: newPlaylist.uri.replace('spotify:playlist:', 'https://open.spotify.com/playlist/')
       });
 
@@ -195,21 +234,39 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
                 <p className="text-gray-400 text-sm">Choose the playlists you want to combine. Duplicates are removed automatically.</p>
              </div>
              
-             <div className="flex space-x-3">
-                 <button 
-                    onClick={handleSelectAll}
-                    className="px-4 py-2 rounded-full border border-[#535353] text-sm font-bold hover:border-white transition-colors"
-                 >
-                    {selectedIds.size === playlists.length ? 'Deselect All' : 'Select All'}
-                 </button>
-                 <div className="bg-[#282828] px-4 py-2 rounded-full text-sm font-bold text-gray-300 border border-transparent">
-                     {selectedIds.size} selected
+             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                 <div className="relative">
+                    <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as SortOption)}
+                        className="appearance-none bg-[#282828] text-white text-sm font-bold rounded-full pl-4 pr-10 py-2 border border-[#535353] hover:border-white focus:outline-none focus:border-spotify-base transition-colors cursor-pointer w-full sm:w-auto"
+                    >
+                        <option value="NAME_ASC">Name (A-Z)</option>
+                        <option value="NAME_DESC">Name (Z-A)</option>
+                        <option value="TRACKS_DESC">Tracks (Most)</option>
+                        <option value="TRACKS_ASC">Tracks (Least)</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-white">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                    </div>
+                 </div>
+
+                 <div className="flex space-x-3">
+                     <button 
+                        onClick={handleSelectAll}
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-full border border-[#535353] text-sm font-bold hover:border-white transition-colors"
+                     >
+                        {selectedIds.size === playlists.length && playlists.length > 0 ? 'Deselect All' : 'Select All'}
+                     </button>
+                     <div className="bg-[#282828] px-4 py-2 rounded-full text-sm font-bold text-gray-300 border border-transparent whitespace-nowrap">
+                         {selectedIds.size} selected
+                     </div>
                  </div>
              </div>
          </div>
 
          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-             {playlists.map(playlist => (
+             {sortedPlaylists.map(playlist => (
                  <PlaylistCard 
                     key={playlist.id} 
                     playlist={playlist} 

@@ -4,11 +4,15 @@ import { CLIENT_ID_STORAGE_KEY, getRedirectUri, SCOPES, SPOTIFY_AUTH_ENDPOINT } 
 const LoginScreen: React.FC = () => {
   const [clientId, setClientId] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
+  const [inIframe, setInIframe] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
     if (stored) setClientId(stored);
     setRedirectUri(getRedirectUri());
+    
+    // Check if running in an iframe
+    setInIframe(window.self !== window.top);
   }, []);
 
   const handleLogin = () => {
@@ -26,7 +30,22 @@ const LoginScreen: React.FC = () => {
       show_dialog: 'true',
     });
 
-    window.location.href = `${SPOTIFY_AUTH_ENDPOINT}?${params.toString()}`;
+    const authUrl = `${SPOTIFY_AUTH_ENDPOINT}?${params.toString()}`;
+
+    // Spotify's auth page sends "X-Frame-Options: DENY", so it cannot be loaded in an iframe.
+    // We must try to navigate the top-level window to break out of the iframe.
+    if (window.top && window.self !== window.top) {
+        try {
+            window.top.location.href = authUrl;
+        } catch (e) {
+            console.warn("Could not redirect top window:", e);
+            // Fallback: try standard navigation. If strict sandbox, this might still fail 
+            // with 'refused to connect', hence the UI warning.
+            window.location.href = authUrl;
+        }
+    } else {
+        window.location.href = authUrl;
+    }
   };
 
   return (
@@ -46,6 +65,20 @@ const LoginScreen: React.FC = () => {
 
         <div className="bg-[#181818] p-6 rounded-lg shadow-xl border border-[#282828] text-left space-y-4">
           <h2 className="text-xl font-semibold mb-2">Configuration</h2>
+          
+          {inIframe && (
+              <div className="bg-yellow-900/30 text-yellow-200 p-3 rounded text-sm border border-yellow-700/50 mb-4 flex items-start space-x-2">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <strong>Running in a preview mode?</strong> <br/>
+                    Spotify authentication will be blocked in this window. <br/>
+                    Please open this app in a new tab/window to log in.
+                  </div>
+              </div>
+          )}
+
           <p className="text-sm text-gray-400 mb-4">
             To use this app, you need a Spotify Client ID. <a href="https://developer.spotify.com/dashboard/applications" target="_blank" rel="noreferrer" className="text-spotify-base underline hover:text-green-400">Create one here</a>.
           </p>
