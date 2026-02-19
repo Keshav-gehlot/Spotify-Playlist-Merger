@@ -30,7 +30,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       try {
         const userData = await spotifyService.getCurrentUser();
         setUser(userData);
-        const userPlaylists = await spotifyService.getUserPlaylists(userData.id);
+        // Call getUserPlaylists without arguments
+        const userPlaylists = await spotifyService.getUserPlaylists();
         setPlaylists(userPlaylists);
       } catch (err: any) {
         console.error("Failed to load data", err);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CLIENT_ID_STORAGE_KEY, getRedirectUri, SCOPES, SPOTIFY_AUTH_ENDPOINT } from '../constants';
 
 const LoginScreen: React.FC = () => {
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState('237c702e5d5d49c5a6529b5e51e8f835');
   const [redirectUri, setRedirectUri] = useState('');
   const [inIframe, setInIframe] = useState(false);
 

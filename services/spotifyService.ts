@@ -45,7 +45,7 @@ export class SpotifyService {
     return response.json();
   }
 
-  async getUserPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
+  async getUserPlaylists(): Promise<SpotifyPlaylist[]> {
     let playlists: SpotifyPlaylist[] = [];
     // Use 'me/playlists' to ensure we get all playlists (owned + followed)
     // We start with the max limit of 50 per page
