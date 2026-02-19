@@ -2,16 +2,35 @@ import React, { useState, useEffect } from 'react';
 
 const LoginScreen: React.FC = () => {
   const [inIframe, setInIframe] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if running in an iframe
     setInIframe(window.self !== window.top);
+
+    // Check backend health/config
+    const checkConfig = async () => {
+        try {
+            // We use /login to test because /api/health might need proxy config adjustments depending on environment
+            // Actually, let's try the dedicated health endpoint assuming proxy forwards /api
+            const res = await fetch('/api/health');
+            if (res.status === 503) {
+                const data = await res.json();
+                setConfigError(data.message);
+            }
+        } catch (e) {
+            console.warn("Could not check backend health", e);
+        }
+    };
+    checkConfig();
   }, []);
 
   const handleLogin = () => {
+    if (configError) {
+        alert("Cannot login: " + configError);
+        return;
+    }
     // Redirect to the Login Endpoint.
-    // Local: Handled by Vite Proxy -> localhost:8000
-    // Prod: Handled by Vercel Rewrites -> Python Function
     window.location.href = '/login';
   };
 
@@ -32,6 +51,17 @@ const LoginScreen: React.FC = () => {
 
         <div className="bg-[#181818] p-8 rounded-xl shadow-xl border border-[#282828] text-center space-y-6">
           
+          {configError && (
+              <div className="bg-red-900/30 text-red-200 p-4 rounded text-sm border border-red-700/50 mb-4 text-left">
+                  <div className="font-bold mb-1 flex items-center gap-2">
+                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                       Setup Required
+                  </div>
+                  <p>{configError}</p>
+                  <p className="mt-2 text-xs opacity-75">Please update the <code>.env</code> file in the project root.</p>
+              </div>
+          )}
+
           {inIframe && (
               <div className="bg-yellow-900/30 text-yellow-200 p-3 rounded text-sm border border-yellow-700/50 mb-4 flex items-start space-x-2 text-left">
                   <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,7 +80,13 @@ const LoginScreen: React.FC = () => {
           
           <button 
             onClick={handleLogin}
-            className="w-full bg-spotify-base hover:bg-spotify-dark text-black font-bold py-4 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(29,185,84,0.3)] flex items-center justify-center space-x-2"
+            disabled={!!configError}
+            className={`
+                w-full font-bold py-4 px-6 rounded-full transition-all transform flex items-center justify-center space-x-2
+                ${configError 
+                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
+                    : 'bg-spotify-base hover:bg-spotify-dark text-black hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(29,185,84,0.3)]'}
+            `}
           >
             <span>Login with Spotify</span>
           </button>

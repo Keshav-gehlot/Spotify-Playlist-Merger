@@ -29,13 +29,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_spotify_oauth():
+def validate_config():
     if not CLIENT_ID or not CLIENT_SECRET:
-        print("CRITICAL ERROR: SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not found.")
-        raise HTTPException(
-            status_code=500, 
-            detail="Server misconfiguration: Missing Spotify Credentials. Please ensure a .env file exists in the root directory with SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET defined."
-        )
+        return "Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET in .env file."
+    if CLIENT_ID == "your_client_id_here" or CLIENT_SECRET == "your_client_secret_here":
+        return "You have not updated the .env file with your actual Spotify Client ID/Secret."
+    return None
+
+def get_spotify_oauth():
+    error = validate_config()
+    if error:
+        print(f"CRITICAL CONFIG ERROR: {error}")
+        raise HTTPException(status_code=500, detail=f"Server Misconfiguration: {error}")
         
     return SpotifyOAuth(
         client_id=CLIENT_ID,
@@ -52,6 +57,9 @@ def login():
         sp_oauth = get_spotify_oauth()
         auth_url = sp_oauth.get_authorize_url()
         return RedirectResponse(auth_url)
+    except HTTPException as he:
+        # Return HTML for better developer experience if accessed directly in browser
+        return JSONResponse({"error": he.detail}, status_code=he.status_code)
     except Exception as e:
          return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -78,6 +86,14 @@ def callback(request: Request, code: str):
     except Exception as e:
         return JSONResponse({"error": f"Authentication failed: {str(e)}"}, status_code=400)
 
-@app.get("/")
+@app.get("/api/health")
 def health_check():
+    error = validate_config()
+    if error:
+        return JSONResponse({"status": "error", "message": error}, status_code=503)
     return {"status": "ok", "service": "Spotify Merger Backend"}
+
+# Fallback for root
+@app.get("/")
+def root():
+    return health_check()
