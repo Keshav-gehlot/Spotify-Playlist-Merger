@@ -25,6 +25,9 @@ export interface SpotifyPlaylist {
     href: string;
   };
   uri: string;
+  external_urls?: {
+    spotify: string;
+  };
 }
 
 export interface SpotifyTrack {
@@ -66,4 +69,5 @@ export interface MergeState {
   message: string;
   error?: string;
   resultUrl?: string;
+  resultPlaylist?: SpotifyPlaylist;
 }

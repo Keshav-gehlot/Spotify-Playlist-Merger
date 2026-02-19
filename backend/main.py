@@ -8,18 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from spotipy.oauth2 import SpotifyOAuth
 
 # --- Configuration ---
-# Ensure these are set in your environment
 CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET")
-# The backend callback URL (must match Spotify Dashboard)
 REDIRECT_URI = os.environ.get("SPOTIFY_REDIRECT_URI", "http://localhost:8000/callback")
-# Where to send the user back to after login (The React App URL)
-# In local dev with Vite, this is usually http://localhost:5173
+# Default frontend URL for local development override
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 app = FastAPI()
 
-# Allow CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,7 +32,6 @@ def get_spotify_oauth():
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        # Scopes required for the Merger App
         scope="playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-read-private user-read-email",
         show_dialog=True
     )
@@ -52,16 +47,23 @@ def login():
          return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/callback")
-def callback(code: str):
-    """Handles OAuth callback, exchanges code for token, and redirects to Frontend with token."""
+def callback(request: Request, code: str):
+    """Handles OAuth callback, exchanges code for token, and redirects to Frontend."""
     try:
         sp_oauth = get_spotify_oauth()
         token_info = sp_oauth.get_access_token(code)
         access_token = token_info.get("access_token")
         
-        # Redirect back to the React App with the token in the URL fragment
-        # This allows the client-side app to extract it without sending it to the server again immediately
-        redirect_url = f"{FRONTEND_URL}/#access_token={access_token}"
+        # Smart Redirect Logic
+        host = request.headers.get("host", "")
+        
+        if "localhost:8000" in host or "127.0.0.1:8000" in host:
+            # Local Dev: We are on API port 8000, need to go back to Frontend port 5173
+            redirect_url = f"{FRONTEND_URL}/#access_token={access_token}"
+        else:
+            # Production: API and Frontend are on the same domain
+            redirect_url = f"/#access_token={access_token}"
+
         return RedirectResponse(redirect_url)
     except Exception as e:
         return JSONResponse({"error": f"Authentication failed: {str(e)}"}, status_code=400)

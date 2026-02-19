@@ -3,6 +3,7 @@ import { SpotifyUser, SpotifyPlaylist, MergeState, MergeStatus } from '../types'
 import { SpotifyService } from '../services/spotifyService';
 import PlaylistCard from './PlaylistCard';
 import MergeStatusModal from './MergeStatusModal';
+import SuccessScreen from './SuccessScreen';
 
 interface DashboardProps {
   accessToken: string;
@@ -17,6 +18,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [sortOption, setSortOption] = useState<SortOption>('NAME_ASC');
+  const [addedCount, setAddedCount] = useState(0);
+  
   const [mergeState, setMergeState] = useState<MergeState>({
     status: MergeStatus.IDLE,
     progress: 0,
@@ -30,7 +33,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       try {
         const userData = await spotifyService.getCurrentUser();
         setUser(userData);
-        // Call getUserPlaylists without arguments
         const userPlaylists = await spotifyService.getUserPlaylists();
         setPlaylists(userPlaylists);
       } catch (err: any) {
@@ -85,18 +87,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
     try {
       // 1. Fetch tracks
-      // Using concurrency to fetch multiple playlists at once to speed up the process
       const selectedPlaylists = playlists.filter(p => selectedIds.has(p.id));
-      
-      // We use a set to track composite keys (Name + Artist + Album) to avoid duplicates
       const seenTracks = new Set<string>();
       const urisToAdd: string[] = [];
-      
       let processedCount = 0;
-      
       const CONCURRENCY_LIMIT = 3;
       
-      // Process playlists in chunks
       for (let i = 0; i < selectedPlaylists.length; i += CONCURRENCY_LIMIT) {
           const chunk = selectedPlaylists.slice(i, i + CONCURRENCY_LIMIT);
           
@@ -111,15 +107,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
               tracks.forEach(t => {
                   if (t.track && t.track.uri) {
                       const trackName = t.track.name.trim().toLowerCase();
-                      const artistName = t.track.artists.length > 0 
-                          ? t.track.artists[0].name.trim().toLowerCase() 
-                          : 'unknown';
-                      // Consider album name to differentiate versions (e.g. Live vs Studio, or different compilations)
-                      const albumName = t.track.album && t.track.album.name 
-                          ? t.track.album.name.trim().toLowerCase() 
-                          : 'unknown';
-                      
-                      // Composite key: name|artist|album
+                      const artistName = t.track.artists.length > 0 ? t.track.artists[0].name.trim().toLowerCase() : 'unknown';
+                      const albumName = t.track.album && t.track.album.name ? t.track.album.name.trim().toLowerCase() : 'unknown';
                       const compositeKey = `${trackName}|${artistName}|${albumName}`;
                       
                       if (!seenTracks.has(compositeKey)) {
@@ -129,13 +118,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
                   }
               });
           }));
-          
           processedCount += chunk.length;
       }
 
-      if (urisToAdd.length === 0) {
-          throw new Error("NO_VALID_TRACKS");
-      }
+      if (urisToAdd.length === 0) throw new Error("NO_VALID_TRACKS");
+
+      setAddedCount(urisToAdd.length);
 
       // 2. Create Playlist
       setMergeState({
@@ -159,19 +147,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
       await spotifyService.addTracksToPlaylist(newPlaylist.id, urisToAdd);
 
+      // Success
       setMergeState({
         status: MergeStatus.SUCCESS,
         progress: 100,
-        message: `Successfully merged ${urisToAdd.length} tracks into "${newPlaylist.name}"`,
-        resultUrl: newPlaylist.uri.replace('spotify:playlist:', 'https://open.spotify.com/playlist/')
+        message: 'Done!',
+        resultUrl: newPlaylist.uri,
+        resultPlaylist: newPlaylist
       });
 
-      // Optional: Deselect all after success
+      // Clear selections so users can start fresh
       setSelectedIds(new Set());
 
     } catch (error: any) {
         console.error("Merge error:", error);
-        
         if (error.message === 'UNAUTHORIZED') {
             onLogout();
             return;
@@ -179,24 +168,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
         let friendlyMessage = "Something went wrong. Please try again.";
         const errorMessage = error?.message || '';
-        
-        if (errorMessage === "NO_VALID_TRACKS" || errorMessage.includes("No valid tracks")) {
-             friendlyMessage = "The selected playlists don't contain any valid tracks to merge.";
-        } else if (errorMessage.includes("Spotify API Error")) {
-             if (errorMessage.includes("429")) {
-                 friendlyMessage = "You're merging too fast! Spotify has temporarily limited requests. Please wait a minute and try again.";
-             } else if (errorMessage.includes("500") || errorMessage.includes("502") || errorMessage.includes("503") || errorMessage.includes("504")) {
-                 friendlyMessage = "Spotify's servers are experiencing issues. Please try again later.";
-             } else if (errorMessage.includes("403")) {
-                 friendlyMessage = "You don't have permission to perform this action. Ensure you are logged in correctly.";
-             } else {
-                 friendlyMessage = "Unable to communicate with Spotify. Please check your internet connection.";
-             }
-        } else if (errorMessage.includes("Failed to fetch") || error.name === 'TypeError') {
-             friendlyMessage = "Network error. Please check your internet connection and try again.";
-        } else if (errorMessage) {
-             friendlyMessage = errorMessage;
-        }
+        if (errorMessage === "NO_VALID_TRACKS") friendlyMessage = "No valid tracks found to merge.";
+        else if (errorMessage.includes("429")) friendlyMessage = "Rate limited. Please wait.";
 
         setMergeState({
             status: MergeStatus.ERROR,
@@ -214,6 +187,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
       }
   };
 
+  const handleReset = () => {
+      setMergeState({ status: MergeStatus.IDLE, progress: 0, message: '' });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center text-white">
@@ -221,6 +198,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
         <p className="text-gray-400 animate-pulse">Loading your library...</p>
       </div>
     );
+  }
+
+  // Render Success Screen if successful
+  if (mergeState.status === MergeStatus.SUCCESS && mergeState.resultPlaylist) {
+      return (
+          <SuccessScreen 
+            playlist={mergeState.resultPlaylist} 
+            trackCount={addedCount} 
+            onReset={handleReset} 
+          />
+      );
   }
 
   return (
@@ -301,7 +289,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
          </div>
       </main>
 
-      {/* Floating Action Button / Bar */}
+      {/* Floating Action Button */}
       <div className={`fixed bottom-0 left-0 right-0 bg-[#181818] border-t border-[#282828] p-4 transition-transform duration-300 transform ${selectedIds.size > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
           <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="text-sm">
@@ -322,7 +310,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accessToken, onLogout }) => {
 
       <MergeStatusModal 
         state={mergeState} 
-        onClose={() => setMergeState(s => ({...s, status: MergeStatus.IDLE}))} 
+        onClose={handleReset} 
         onRetry={handleMerge}
       />
     </div>
