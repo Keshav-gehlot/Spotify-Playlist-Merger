@@ -9,6 +9,8 @@ const LoginScreen: React.FC = () => {
   useEffect(() => {
     const stored = localStorage.getItem(CLIENT_ID_STORAGE_KEY);
     if (stored) setClientId(stored);
+    
+    // Default to calculated URI, but allow user to edit
     setRedirectUri(getRedirectUri());
     
     // Check if running in an iframe
@@ -98,11 +100,17 @@ const LoginScreen: React.FC = () => {
           
           <div>
              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Redirect URI (Set this in Spotify Dashboard)
+              Redirect URI (Must match exactly in Spotify Dashboard)
             </label>
-             <div className="bg-[#121212] border border-[#333] text-gray-300 rounded p-3 text-sm break-all font-mono">
-                {redirectUri}
-             </div>
+             <input 
+              type="text"
+              value={redirectUri}
+              onChange={(e) => setRedirectUri(e.target.value)}
+              className="w-full bg-[#121212] border border-[#333] text-gray-300 rounded p-3 text-sm font-mono focus:outline-none focus:border-spotify-base transition-colors"
+             />
+             <p className="text-xs text-gray-500 mt-1">
+               <strong>Important:</strong> Ensure this URL is added to your Spotify App's Redirect URIs setting. It must match character-for-character (including http/https and trailing slashes).
+             </p>
           </div>
 
           <button 
